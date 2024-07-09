@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getProvider, getBalance, getTokenAccounts, getTokenMetadata } from '../utils/solana';
+import { getProvider, getBalance, getTokenAccounts, getTokenMetadata, decodeTokenAccount } from '../utils/solana';
 
 export default function WalletConnectionButton() {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -21,7 +21,8 @@ export default function WalletConnectionButton() {
         setTokenAccounts(tokens);
 
         const nftPromises = tokens.map(async (token) => {
-          const metadata = await getTokenMetadata(token.account.data.parsed.info.mint);
+          const decodedToken = decodeTokenAccount(token.account.data);
+          const metadata = await getTokenMetadata(decodedToken.mint);
           if (metadata && metadata.data.data.symbol === 'NFT') {
             return metadata;
           }
@@ -30,7 +31,15 @@ export default function WalletConnectionButton() {
 
         const nftResults = await Promise.all(nftPromises);
         const nftList = nftResults.filter(nft => nft !== null);
-        setNfts(nftList);
+        const nftData = await Promise.all(nftList.map(async (nft) => {
+          const response = await fetch(nft.data.data.uri);
+          const data = await response.json();
+          return {
+            ...nft,
+            imageUrl: data.image
+          };
+        }));
+        setNfts(nftData);
       }
     };
 
@@ -49,18 +58,32 @@ export default function WalletConnectionButton() {
           setBalance(accountBalance);
           const tokens = await getTokenAccounts(address);
           setTokenAccounts(tokens);
+          console.log(tokens, "'''''''''''''''''''''''''''''''''''token");
 
           const nftPromises = tokens.map(async (token) => {
-            const metadata = await getTokenMetadata(token.account.data.parsed.info.mint);
-            if (metadata && metadata.data.data.symbol === 'NFT') {
+            console.log(token.account.data, "''''''''''''''''''''////////////////");
+            const decodedToken = decodeTokenAccount(token.account.data);
+            const metadata = await getTokenMetadata(decodedToken.mint);
+            console.log(metadata, "..............................meta-data");
+            if (metadata && metadata.data.data.symbol === 'XST') {
               return metadata;
             }
             return null;
           });
 
           const nftResults = await Promise.all(nftPromises);
+          console.log(nftResults, "'''''''''''''''''''''''''''''''''''nft-1");
           const nftList = nftResults.filter(nft => nft !== null);
-          setNfts(nftList);
+          console.log(nftList, "'''''''''''''''''''''''''''''''''''nft-LIST");
+          const nftData = await Promise.all(nftList.map(async (nft) => {
+            const response = await fetch(nft.data.data.uri);
+            const data = await response.json();
+            return {
+              ...nft,
+              imageUrl: data.image
+            };
+          }));
+          setNfts(nftData);
         }
       } catch (err) {
         console.error(err);
@@ -95,7 +118,7 @@ export default function WalletConnectionButton() {
                 <li key={index}>
                   <p>Name: {nft.data.data.name}</p>
                   <p>Symbol: {nft.data.data.symbol}</p>
-                  <img src={nft.data.data.uri} alt={nft.data.data.name} width="100" />
+                  <img src={nft.imageUrl} alt={nft.data.data.name} width="100" />
                 </li>
               ))}
             </ul>

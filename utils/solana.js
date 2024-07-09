@@ -1,9 +1,10 @@
-// utils/solana.js
 import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { programs } from '@metaplex/js';
+import { struct, u8, blob } from 'buffer-layout';
+
+const { metadata: { Metadata } } = programs;
 
 const SOLANA_DEVNET_RPC_ENDPOINT = clusterApiUrl('devnet');
-const { metadata: { Metadata } } = programs;
 
 export const getProvider = () => {
   if ('solana' in window) {
@@ -27,26 +28,36 @@ export const getBalance = async (publicKey) => {
 };
 
 export const getTokenAccounts = async (publicKey) => {
-  try {
-    const connection = new Connection(SOLANA_DEVNET_RPC_ENDPOINT);
-    const tokenAccounts = await connection.getTokenAccountsByOwner(new PublicKey(publicKey), {
-      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-    });
-    return tokenAccounts.value;
-  } catch (error) {
-    console.error('Error fetching token accounts:', error);
-    return null;
-  }
+  const connection = new Connection(SOLANA_DEVNET_RPC_ENDPOINT);
+  const accounts = await connection.getTokenAccountsByOwner(
+    new PublicKey(publicKey),
+    { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
+  );
+  return accounts.value;
 };
 
-export const getTokenMetadata = async (tokenMintAddress) => {
-  try {
-    const connection = new Connection(SOLANA_DEVNET_RPC_ENDPOINT);
-    const metadataPDA = await Metadata.getPDA(new PublicKey(tokenMintAddress));
-    const metadata = await Metadata.load(connection, metadataPDA);
-    return metadata;
-  } catch (error) {
-    console.error('Error fetching token metadata:', error);
-    return null;
-  }
+const ACCOUNT_LAYOUT = struct([
+  blob(32, 'mint'),
+  blob(32, 'owner'),
+  u64('amount'),
+  blob(93, 'padding')
+]);
+
+function u64(property = 'u64') {
+  return blob(8, property);
+}
+
+export const decodeTokenAccount = (data) => {
+  const decodedData = ACCOUNT_LAYOUT.decode(data);
+  decodedData.mint = new PublicKey(decodedData.mint).toString();
+  decodedData.owner = new PublicKey(decodedData.owner).toString();
+  return decodedData;
+};
+
+export const getTokenMetadata = async (mintAddress) => {
+  const connection = new Connection(SOLANA_DEVNET_RPC_ENDPOINT);
+  const mintPublicKey = new PublicKey(mintAddress);
+  const metadataPDA = await Metadata.getPDA(mintPublicKey);
+  const metadataAccount = await Metadata.load(connection, metadataPDA);
+  return metadataAccount;
 };
