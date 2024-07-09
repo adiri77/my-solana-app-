@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getProvider, getBalance, getTokenAccounts, getTokenMetadata, decodeTokenAccount } from '../utils/solana';
+const NFT_SYMBOLS = ['XST', 'DEGODS', 'SMB', 'AURORY'];
 
 export default function WalletConnectionButton() {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -65,7 +66,7 @@ export default function WalletConnectionButton() {
             const decodedToken = decodeTokenAccount(token.account.data);
             const metadata = await getTokenMetadata(decodedToken.mint);
             console.log(metadata, "..............................meta-data");
-            if (metadata && metadata.data.data.symbol === 'XST') {
+            if (metadata && NFT_SYMBOLS.includes(metadata.data.data.symbol)) {
               return metadata;
             }
             return null;
